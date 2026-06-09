@@ -1,5 +1,5 @@
 mod calculate;
-mod extract;
+mod extract_sec;
 mod extract_edinet;
 mod parse;
 
@@ -18,13 +18,13 @@ fn main() {
         let data = extract_edinet::get_data(sec_code);
         calculate::print(&input, data);
     } else {
-        extract::get_company_tickers();
-        let cik = extract::return_ticker(&input);
+        extract_sec::get_company_tickers();          // extract_src → extract_sec
+        let cik = extract_sec::return_ticker(&input); // extract_src → extract_sec
         if cik.is_empty() {
             eprintln!("티커를 찾을 수 없습니다: {}", input);
             std::process::exit(1);
         }
-        extract::get_company_facts(&input, &cik);
+        extract_sec::get_company_facts(&input, &cik);
         let data = parse::Data::new(&input);
         calculate::print(&input, data);
     }
