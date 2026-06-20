@@ -3,7 +3,7 @@ load_dotenv()
 
 import sys
 import calculate
-import email
+import report
 import extract
 import parse
 
@@ -34,7 +34,7 @@ def main():
         ans = "n"
 
     if ans == "y":
-        email.send_email(input_ticker, data)
+        report.send_email(input_ticker, data)
 
 
 if __name__ == "__main__":
