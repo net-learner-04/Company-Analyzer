@@ -15,13 +15,13 @@ def main():
 
     input_ticker = args[1].upper()
 
-    extract_sec.get_company_tickers()
-    cik = extract_sec.return_ticker(input_ticker)
+    extract.get_company_tickers()
+    cik = extract.return_ticker(input_ticker)
     if not cik:
         print(f"티커를 찾을 수 없습니다: {input_ticker}", file=sys.stderr)
         sys.exit(1)
 
-    extract_sec.get_company_facts(input_ticker, cik)
+    extract.get_company_facts(input_ticker, cik)
     data = parse.Data.new(input_ticker)
     calculate.print_table(input_ticker, data)
 
