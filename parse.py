@@ -1,5 +1,5 @@
 import json
-import extract_sec
+import extract
 
 
 def extract_latest(json_data, keys):
@@ -67,7 +67,7 @@ class Data:
 
     @staticmethod
     def new(ticker: str) -> "Data":
-        path = extract_sec.facts_file_path(ticker)
+        path = extract.facts_file_path(ticker)
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
         json_data = json.loads(content)
