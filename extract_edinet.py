@@ -49,12 +49,12 @@ def stale(path: Path) -> bool:
         return True
 
 
-def api_key() -> str:
+def api_key():
     key = os.environ.get("EDINET_API_KEY")
-    if key is None:
+    if not key:
         print("[오류] EDINET_API_KEY 환경변수를 설정해주세요.", file=sys.stderr)
         print("  발급 : https://api.edinet-fsa.go.jp/", file=sys.stderr)
-        print("  설정 : export EDINET_API_KEY=<key>", file=sys.stderr)
+        print("  .env 파일에 EDINET_API_KEY=<key> 추가", file=sys.stderr)
         sys.exit(1)
     return key
 
