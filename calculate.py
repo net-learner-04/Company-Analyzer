@@ -256,3 +256,114 @@ def print_table(ticker: str, data):
     console = Console()
     console.print()
     console.print(table)
+
+
+def _avg(vals):
+    if not vals:
+        return None
+    return sum(v for _, v in vals) / len(vals)
+
+
+def _trend_color(vals):
+    s = sorted(vals, key=lambda x: x[0])
+    if len(s) < 2:
+        return None
+    return "green" if s[-1][1] > s[0][1] else ("red" if s[-1][1] < s[0][1] else None)
+
+
+def _avg_pct_cell(vals) -> Text:
+    a = _avg(vals)
+    if a is None:
+        return Text("N/A", justify="right")
+    color = _trend_color(vals)
+    t = Text(f"{a:.2f}%", justify="right")
+    if color:
+        t.stylize(color)
+    return t
+
+
+def _avg_x_cell(vals) -> Text:
+    a = _avg(vals)
+    if a is None:
+        return Text("N/A", justify="right")
+    color = _trend_color(vals)
+    t = Text(f"{a:.2f}x", justify="right")
+    if color:
+        t.stylize(color)
+    return t
+
+
+def _growth_series_cell(vals) -> Text:
+    s = sorted(vals, key=lambda x: x[0])
+    result = Text()
+    for i, (_, v) in enumerate(s):
+        seg = Text(f"{v:+.2f}%")
+        if v > 0:
+            seg.stylize("green")
+        elif v < 0:
+            seg.stylize("red")
+        result.append_text(seg)
+        if i < len(s) - 1:
+            result.append("  →  ")
+    return result
+
+
+def print_summary(ticker: str, data):
+    roe_val = roe(data.netincomeloss, data.stockholdersequity)
+    roa_val = roa(data.netincomeloss, data.assets)
+    opm_val = opm(data.operatingincomeloss, data.revenues)
+    npm_val = npm(data.netincomeloss, data.revenues)
+    der_val = der(data.liabilities, data.stockholdersequity)
+    er_val = er(data.stockholdersequity, data.assets)
+    at_val = at(data.revenues, data.assets)
+    dr_val = debt_ratio(data.liabilities, data.assets)
+    em_val = equity_multiplier(data.assets, data.stockholdersequity)
+    rev_growth = yoy_growth(data.revenues)
+    ni_growth = yoy_growth(data.netincomeloss)
+
+    years = sorted(set(
+        d[:4]
+        for ds in (data.revenues, data.netincomeloss, data.operatingincomeloss,
+                   data.assets, data.liabilities, data.stockholdersequity)
+        for d, _ in ds if len(d) >= 4
+    ))
+    year_range = f"{years[0]}–{years[-1]}" if len(years) >= 2 else (years[0] if years else "")
+
+    console = Console()
+    console.print()
+    console.print(f"=== {ticker} 핵심 요약 ({year_range}) ===")
+    console.print()
+
+    console.print("성장성")
+    g_table = Table(box=None, show_header=False, padding=(0, 2))
+    g_table.add_column(no_wrap=True, min_width=16)
+    g_table.add_column(justify="right", no_wrap=True, min_width=10)
+    g_table.add_column(no_wrap=True)
+    g_table.add_row("  매출 성장률", _avg_pct_cell(rev_growth), _growth_series_cell(rev_growth))
+    g_table.add_row("  순이익 성장률", _avg_pct_cell(ni_growth), _growth_series_cell(ni_growth))
+    console.print(g_table)
+
+    console.print()
+    console.print("수익성 (평균)")
+    p_table = Table(box=None, show_header=False, padding=(0, 2))
+    p_table.add_column(no_wrap=True, min_width=24)
+    p_table.add_column(justify="right", no_wrap=True, min_width=10)
+    p_table.add_row("  자기자본이익률  (ROE)", _avg_pct_cell(roe_val))
+    p_table.add_row("  총자산이익률    (ROA)", _avg_pct_cell(roa_val))
+    p_table.add_row("  영업이익률      (OPM)", _avg_pct_cell(opm_val))
+    p_table.add_row("  순이익률        (NPM)", _avg_pct_cell(npm_val))
+    console.print(p_table)
+
+    console.print()
+    console.print("안정성 (평균)")
+    s_table = Table(box=None, show_header=False, padding=(0, 2))
+    s_table.add_column(no_wrap=True, min_width=24)
+    s_table.add_column(justify="right", no_wrap=True, min_width=10)
+    s_table.add_row("  부채자본비율    (DER)", _avg_pct_cell(der_val))
+    s_table.add_row("  총부채비율      (DR) ", _avg_pct_cell(dr_val))
+    s_table.add_row("  자기자본비율    (ER) ", _avg_pct_cell(er_val))
+    s_table.add_row("  자산회전율      (AT) ", _avg_x_cell(at_val))
+    s_table.add_row("  재무레버리지    (EM) ", _avg_x_cell(em_val))
+    console.print(s_table)
+
+    console.print()
