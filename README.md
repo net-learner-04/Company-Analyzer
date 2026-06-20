@@ -14,7 +14,7 @@
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠛⠒⠲⠶⠤⠴⠒⠚⠁⠀⠀
 ```
 
-# company_analyzer
+# Company_Analyzer
 
 ## 파일별 기능
 
@@ -22,11 +22,12 @@
 - **extract.py** : SEC EDGAR에서 티커 목록이랑 회사 재무 데이터(XBRL) 다운로드, 24시간 캐싱
 - **parse.py** : SEC에서 받은 JSON 안에서 매출/순이익/자산/부채 같은 항목 뽑아서 정리
 - **calculate.py** : ROE, ROA, 듀폰분석 등 재무비율 계산하고 콘솔에 표로 출력
+- **email.py** : 기업의 자세한 지표 테이블을 이메일로 전송할지 말지 결정
 
 ## 설치
 
 ```bash
-pip3 install -r requirements.txt
+pip3 install -r modules.txt
 ```
 
 ## 실행
