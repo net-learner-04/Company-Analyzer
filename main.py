@@ -3,8 +3,10 @@ load_dotenv()
 
 import sys
 import calculate
-import extract_sec
+import email
+import extract
 import parse
+
 
 def main():
     args = sys.argv
@@ -23,7 +25,17 @@ def main():
 
     extract.get_company_facts(input_ticker, cik)
     data = parse.Data.new(input_ticker)
-    calculate.print_table(input_ticker, data)
+
+    calculate.print_summary(input_ticker, data)
+
+    try:
+        ans = input("상세 지표를 이메일로 받으시겠습니까? (y/n): ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        ans = "n"
+
+    if ans == "y":
+        email.send_email(input_ticker, data)
+
 
 if __name__ == "__main__":
     main()
