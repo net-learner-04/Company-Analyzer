@@ -22,7 +22,7 @@
 - **extract.py** : SEC EDGAR에서 티커 목록이랑 회사 재무 데이터(XBRL) 다운로드, 24시간 캐싱
 - **parse.py** : SEC에서 받은 JSON 안에서 매출/순이익/자산/부채 같은 항목 뽑아서 정리
 - **calculate.py** : ROE, ROA, 듀폰분석 등 재무비율 계산하고 콘솔에 표로 출력
-- **report.py** : 기업의 자세한 지표 테이블을 이메일로 전송할지 말지 결정
+- **discord.py** : 기업의 자세한 지표 테이블을 디스코드 서버의 웹 후크를 이용하여 서버로 전송
 
 ## 설치
 
@@ -33,5 +33,5 @@ pip3 install -r modules.txt
 ## 실행
 
 ```bash
-python3 main.py AAPL          # 미국 주식
+python3 main.py AAPL          # 오직 미국 주식 티커만 사용 가능
 ```
