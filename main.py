@@ -1,11 +1,7 @@
 from dotenv import load_dotenv
-load_dotenv()
+import sys, calculate, discord, extract, parse
 
-import sys
-import calculate
-import report
-import extract
-import parse
+load_dotenv()
 
 
 def main():
@@ -24,17 +20,18 @@ def main():
         sys.exit(1)
 
     extract.get_company_facts(input_ticker, cik)
+    sector = extract.get_company_sic(input_ticker, cik)
     data = parse.Data.new(input_ticker)
 
-    calculate.print_summary(input_ticker, data)
+    calculate.print_summary(input_ticker, data, sector)
 
     try:
-        ans = input("상세 지표를 이메일로 받으시겠습니까? (y/n): ").strip().lower()
+        ans = input("Discord에 전송하시겠습니까? (y/n): ").strip().lower()
     except (EOFError, KeyboardInterrupt):
         ans = "n"
 
     if ans == "y":
-        report.send_email(input_ticker, data)
+        discord.send_discord(input_ticker, data, sector)
 
 
 if __name__ == "__main__":
