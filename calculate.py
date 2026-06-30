@@ -8,6 +8,51 @@ from rich.table import Table
 from rich.text import Text
 
 
+METRICS = {
+    "roe": dict(
+        label="ROE (자기자본이익률)",
+        desc="자기자본 대비 이익 창출 능력",
+        # (기준치, 점수) 방식 - 예를 들어 roe 15 ~ 25 점이면 3점으로 책정. (단, der 처럼 낮을수록 좋은 지표는 그 반대임)
+        points=[(0, 1), (8, 2), (15, 3), (25, 4)], default=5,
+    ),
+    "roa": dict(
+        label="ROA (총자산이익률)",
+        desc="총자산을 활용한 수익 창출 효율",
+        points=[(0, 1), (2, 2), (8, 3), (15, 4)], default=5,
+    ),
+    "opm": dict(
+        label="OPM (영업이익률)",
+        desc="본업에서의 수익 창출력",
+        points=[(0, 1), (5, 2), (15, 3), (25, 4)], default=5,
+    ),
+    "npm": dict(
+        label="NPM (순이익률)",
+        desc="매출 대비 최종적으로 남는 이익 비중",
+        points=[(0, 1), (3, 2), (10, 3), (18, 4)], default=5,
+    ),
+    "er": dict(
+        label="ER (자기자본비율)",
+        desc="총자산 중 자기자본이 차지하는 비중, 높을수록 재무구조 안정",
+        points=[(10, 1), (20, 2), (40, 3), (60, 4)], default=5,
+    ),
+    "der": dict(
+        label="DER (부채자본비율)",
+        desc="자기자본 대비 부채 의존도, 낮을수록 안정적",
+        points=[(50, 5), (80, 4), (150, 3), (300, 2)], default=1,
+    ),
+    "dr": dict(
+        label="DR (총부채비율)",
+        desc="총자산 중 부채가 차지하는 비중, 낮을수록 안정적",
+        points=[(40, 5), (50, 4), (70, 3), (80, 2)], default=1,
+    ),
+    "growth": dict(
+        label="성장률",
+        desc="매출 및 순이익의 전년 대비 증감 추세",
+        points=[(-10, 1), (0, 2), (10, 3), (20, 4)], default=5,
+    ),
+}
+
+
 def _disp_width(s: str) -> int:
     return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in s)
 
@@ -284,49 +329,6 @@ def _scale(v: float, points: list, default: int) -> int:
             return sc
     return default
 
-
-METRICS = {
-    "roe": dict(
-        label="ROE (자기자본이익률)",
-        desc="자기자본 대비 이익 창출 능력",
-        points=[(0, 1), (8, 2), (15, 3), (25, 4)], default=5,
-    ),
-    "roa": dict(
-        label="ROA (총자산이익률)",
-        desc="총자산을 활용한 수익 창출 효율",
-        points=[(0, 1), (2, 2), (8, 3), (15, 4)], default=5,
-    ),
-    "opm": dict(
-        label="OPM (영업이익률)",
-        desc="본업에서의 수익 창출력",
-        points=[(0, 1), (5, 2), (15, 3), (25, 4)], default=5,
-    ),
-    "npm": dict(
-        label="NPM (순이익률)",
-        desc="매출 대비 최종적으로 남는 이익 비중",
-        points=[(0, 1), (3, 2), (10, 3), (18, 4)], default=5,
-    ),
-    "er": dict(
-        label="ER (자기자본비율)",
-        desc="총자산 중 자기자본이 차지하는 비중, 높을수록 재무구조 안정",
-        points=[(10, 1), (20, 2), (40, 3), (60, 4)], default=5,
-    ),
-    "der": dict(
-        label="DER (부채자본비율)",
-        desc="자기자본 대비 부채 의존도, 낮을수록 안정적",
-        points=[(50, 5), (80, 4), (150, 3), (300, 2)], default=1,
-    ),
-    "dr": dict(
-        label="DR (총부채비율)",
-        desc="총자산 중 부채가 차지하는 비중, 낮을수록 안정적",
-        points=[(40, 5), (50, 4), (70, 3), (80, 2)], default=1,
-    ),
-    "growth": dict(
-        label="성장률",
-        desc="매출 및 순이익의 전년 대비 증감 추세",
-        points=[(-10, 1), (0, 2), (10, 3), (20, 4)], default=5,
-    ),
-}
 
 PHRASE = {1: "매우 저조", 2: "저조", 3: "평균 수준", 4: "양호", 5: "우수"}
 LEVEL_LABEL = {1: "위험", 2: "미흡", 3: "보통", 4: "양호", 5: "우수"}
