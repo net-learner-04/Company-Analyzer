@@ -1,7 +1,20 @@
+import unicodedata
 from rich import box
-from rich.console import Console
+from rich.columns import Columns
+from rich.console import Console, Group
+from rich.panel import Panel
+from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
+
+
+def _disp_width(s: str) -> int:
+    return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in s)
+
+
+def _ljust(s: str, width: int) -> str:
+    pad = max(0, width - _disp_width(s))
+    return s + " " * pad
 
 
 def match_years(base, other, calc):
@@ -258,57 +271,140 @@ def print_table(ticker: str, data):
     console.print(table)
 
 
+
 def _avg(vals):
     if not vals:
         return None
     return sum(v for _, v in vals) / len(vals)
 
 
-def _trend_color(vals):
-    s = sorted(vals, key=lambda x: x[0])
-    if len(s) < 2:
-        return None
-    return "green" if s[-1][1] > s[0][1] else ("red" if s[-1][1] < s[0][1] else None)
+def _scale(v: float, points: list, default: int) -> int:
+    for limit, sc in points:
+        if v < limit:
+            return sc
+    return default
 
 
-def _avg_pct_cell(vals) -> Text:
-    a = _avg(vals)
-    if a is None:
-        return Text("N/A", justify="right")
-    color = _trend_color(vals)
-    t = Text(f"{a:.2f}%", justify="right")
-    if color:
-        t.stylize(color)
+METRICS = {
+    "roe": dict(
+        label="ROE (자기자본이익률)",
+        desc="자기자본 대비 이익 창출 능력",
+        points=[(0, 1), (8, 2), (15, 3), (25, 4)], default=5,
+    ),
+    "roa": dict(
+        label="ROA (총자산이익률)",
+        desc="총자산을 활용한 수익 창출 효율",
+        points=[(0, 1), (2, 2), (8, 3), (15, 4)], default=5,
+    ),
+    "opm": dict(
+        label="OPM (영업이익률)",
+        desc="본업에서의 수익 창출력",
+        points=[(0, 1), (5, 2), (15, 3), (25, 4)], default=5,
+    ),
+    "npm": dict(
+        label="NPM (순이익률)",
+        desc="매출 대비 최종적으로 남는 이익 비중",
+        points=[(0, 1), (3, 2), (10, 3), (18, 4)], default=5,
+    ),
+    "er": dict(
+        label="ER (자기자본비율)",
+        desc="총자산 중 자기자본이 차지하는 비중, 높을수록 재무구조 안정",
+        points=[(10, 1), (20, 2), (40, 3), (60, 4)], default=5,
+    ),
+    "der": dict(
+        label="DER (부채자본비율)",
+        desc="자기자본 대비 부채 의존도, 낮을수록 안정적",
+        points=[(50, 5), (80, 4), (150, 3), (300, 2)], default=1,
+    ),
+    "dr": dict(
+        label="DR (총부채비율)",
+        desc="총자산 중 부채가 차지하는 비중, 낮을수록 안정적",
+        points=[(40, 5), (50, 4), (70, 3), (80, 2)], default=1,
+    ),
+    "growth": dict(
+        label="성장률",
+        desc="매출 및 순이익의 전년 대비 증감 추세",
+        points=[(-10, 1), (0, 2), (10, 3), (20, 4)], default=5,
+    ),
+}
+
+PHRASE = {1: "매우 저조", 2: "저조", 3: "평균 수준", 4: "양호", 5: "우수"}
+LEVEL_LABEL = {1: "위험", 2: "미흡", 3: "보통", 4: "양호", 5: "우수"}
+
+
+def metric_score(key: str, v: float) -> int:
+    m = METRICS[key]
+    return _scale(v, m["points"], m["default"])
+
+
+def metric_color(key: str, v: float) -> str:
+    sc = metric_score(key, v)
+    if sc <= 2:
+        return "red"
+    if sc == 3:
+        return "yellow"
+    return "green"
+
+
+def metric_phrase(key: str, v: float) -> str:
+    return PHRASE[metric_score(key, v)]
+
+
+def _cell(v: float, metric_key: str = None, fmt: str = "pct") -> Text:
+    if fmt == "x":
+        return Text(f"{v:.2f}x")
+    text = f"{v:+.2f}%" if fmt == "growth" else f"{v:.2f}%"
+    t = Text(text)
+    if metric_key:
+        t.stylize(metric_color(metric_key, v))
     return t
 
 
-def _avg_x_cell(vals) -> Text:
-    a = _avg(vals)
-    if a is None:
-        return Text("N/A", justify="right")
-    color = _trend_color(vals)
-    t = Text(f"{a:.2f}x", justify="right")
-    if color:
-        t.stylize(color)
-    return t
-
-
-def _growth_series_cell(vals) -> Text:
+def _series_text(vals, metric_key: str = None, fmt: str = "pct") -> Text:
     s = sorted(vals, key=lambda x: x[0])
     result = Text()
     for i, (_, v) in enumerate(s):
-        seg = Text(f"{v:+.2f}%")
-        if v > 0:
-            seg.stylize("green")
-        elif v < 0:
-            seg.stylize("red")
-        result.append_text(seg)
+        result.append_text(_cell(v, metric_key, fmt))
         if i < len(s) - 1:
             result.append("  →  ")
     return result
 
 
-def print_summary(ticker: str, data):
+def _print_row(console: Console, label: str, vals, metric_key: str = None, fmt: str = "pct", label_width: int = 24):
+    row = Text()
+    row.append(f"  {_ljust(label, label_width)}")
+    row.append_text(_series_text(vals, metric_key, fmt))
+    console.print(row)
+
+
+def evaluate(roe_val, roa_val, opm_val, npm_val, er_val, der_val, dr_val, rev_growth, ni_growth):
+    reasons = []
+
+    def add(key, vals, label=None):
+        avg_v = _avg(vals)
+        if avg_v is None:
+            return
+        sc = metric_score(key, avg_v)
+        reasons.append((label or METRICS[key]["label"], avg_v, sc))
+
+    add("roe", roe_val)
+    add("roa", roa_val)
+    add("opm", opm_val)
+    add("npm", npm_val)
+    add("er", er_val)
+    add("der", der_val)
+    add("dr", dr_val)
+    add("growth", rev_growth + ni_growth, label="성장률")
+
+    if not reasons:
+        return None, None, []
+
+    avg_score = sum(sc for _, _, sc in reasons) / len(reasons)
+    level = max(1, min(5, round(avg_score)))
+    return level, LEVEL_LABEL[level], reasons
+
+
+def print_summary(ticker: str, data, sector: str = ""):
     roe_val = roe(data.netincomeloss, data.stockholdersequity)
     roa_val = roa(data.netincomeloss, data.assets)
     opm_val = opm(data.operatingincomeloss, data.revenues)
@@ -327,43 +423,46 @@ def print_summary(ticker: str, data):
                    data.assets, data.liabilities, data.stockholdersequity)
         for d, _ in ds if len(d) >= 4
     ))
-    year_range = f"{years[0]}–{years[-1]}" if len(years) >= 2 else (years[0] if years else "")
+    year_range = f"{years[0]} – {years[-1]}" if len(years) >= 2 else (years[0] if years else "")
 
     console = Console()
     console.print()
-    console.print(f"=== {ticker} 핵심 요약 ({year_range}) ===")
+    header = Text()
+    header.append(f" {ticker} ", style="bold")
+    if sector:
+        header.append(f" {sector} ", style="cyan")
+    header.append(f"  {year_range}", style="dim")
+    console.print(header)
     console.print()
 
-    console.print("성장성")
-    g_table = Table(box=None, show_header=False, padding=(0, 2))
-    g_table.add_column(no_wrap=True, min_width=16)
-    g_table.add_column(justify="right", no_wrap=True, min_width=10)
-    g_table.add_column(no_wrap=True)
-    g_table.add_row("  매출 성장률", _avg_pct_cell(rev_growth), _growth_series_cell(rev_growth))
-    g_table.add_row("  순이익 성장률", _avg_pct_cell(ni_growth), _growth_series_cell(ni_growth))
-    console.print(g_table)
-
+    _print_row(console, "매출 성장률", rev_growth, metric_key="growth", fmt="growth")
+    _print_row(console, "순이익 성장률", ni_growth, metric_key="growth", fmt="growth")
     console.print()
-    console.print("수익성 (평균)")
-    p_table = Table(box=None, show_header=False, padding=(0, 2))
-    p_table.add_column(no_wrap=True, min_width=24)
-    p_table.add_column(justify="right", no_wrap=True, min_width=10)
-    p_table.add_row("  자기자본이익률  (ROE)", _avg_pct_cell(roe_val))
-    p_table.add_row("  총자산이익률    (ROA)", _avg_pct_cell(roa_val))
-    p_table.add_row("  영업이익률      (OPM)", _avg_pct_cell(opm_val))
-    p_table.add_row("  순이익률        (NPM)", _avg_pct_cell(npm_val))
-    console.print(p_table)
 
+    _print_row(console, "ROE (자기자본이익률)", roe_val, metric_key="roe", fmt="pct")
+    _print_row(console, "ROA (총자산이익률)", roa_val, metric_key="roa", fmt="pct")
+    _print_row(console, "OPM (영업이익률)", opm_val, metric_key="opm", fmt="pct")
+    _print_row(console, "NPM (순이익률)", npm_val, metric_key="npm", fmt="pct")
     console.print()
-    console.print("안정성 (평균)")
-    s_table = Table(box=None, show_header=False, padding=(0, 2))
-    s_table.add_column(no_wrap=True, min_width=24)
-    s_table.add_column(justify="right", no_wrap=True, min_width=10)
-    s_table.add_row("  부채자본비율    (DER)", _avg_pct_cell(der_val))
-    s_table.add_row("  총부채비율      (DR) ", _avg_pct_cell(dr_val))
-    s_table.add_row("  자기자본비율    (ER) ", _avg_pct_cell(er_val))
-    s_table.add_row("  자산회전율      (AT) ", _avg_x_cell(at_val))
-    s_table.add_row("  재무레버리지    (EM) ", _avg_x_cell(em_val))
-    console.print(s_table)
 
+    _print_row(console, "DER (부채자본비율)", der_val, metric_key="der", fmt="pct")
+    _print_row(console, "DR (총부채비율)", dr_val, metric_key="dr", fmt="pct")
+    _print_row(console, "ER (자기자본비율)", er_val, metric_key="er", fmt="pct")
+    _print_row(console, "AT (자산회전율)", at_val, fmt="x")
+    _print_row(console, "EM (재무레버리지)", em_val, fmt="x")
     console.print()
+
+    level, label, reasons = evaluate(roe_val, roa_val, opm_val, npm_val, er_val, der_val, dr_val, rev_growth, ni_growth)
+    if level is not None:
+        color = {1: "red", 2: "red", 3: "yellow", 4: "green", 5: "green"}[level]
+        verdict = Text()
+        verdict.append("  종합 평가  ")
+        verdict.append(f"{label}", style=f"bold {color}")
+        verdict.append(f"  ({level}/5단계)", style="dim")
+        console.print(verdict)
+
+        strongest = max(reasons, key=lambda r: r[2])
+        weakest = min(reasons, key=lambda r: r[2])
+        console.print(f"  강점: {strongest[0]}  (평균 {strongest[1]:.2f}%, {PHRASE[strongest[2]]})", style="dim")
+        console.print(f"  약점: {weakest[0]}  (평균 {weakest[1]:.2f}%, {PHRASE[weakest[2]]})", style="dim")
+        console.print()
