@@ -1,4 +1,4 @@
-import json, os, time, requests
+import json, time, requests
 from pathlib import Path
 
 
@@ -6,11 +6,8 @@ USER_AGENT = "company-analyzer pminseo2004@gmail.com"
 
 
 def directory_path() -> Path:
-    env = os.environ.get("HOME")
-    if env is None:
-        raise RuntimeError("Failed to find home directory")
-    path = Path(env)
-    path = path / "ca_json"
+    base = Path(__file__).resolve().parent
+    path = base / "ca_json"
     return path
 
 
