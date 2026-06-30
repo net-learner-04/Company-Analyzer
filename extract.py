@@ -1,8 +1,8 @@
-import json
-import os
-import time
+import json, os, time, requests
 from pathlib import Path
-import requests
+
+
+USER_AGENT = "company-analyzer pminseo2004@gmail.com"
 
 
 def directory_path() -> Path:
@@ -23,6 +23,12 @@ def ticker_file_path() -> Path:
 def facts_file_path(ticker: str) -> Path:
     path = directory_path()
     path = path / f"{ticker}-facts.json"
+    return path
+
+
+def sic_file_path(ticker: str) -> Path:
+    path = directory_path()
+    path = path / f"{ticker}-sic.json"
     return path
 
 
@@ -48,9 +54,9 @@ def get_company_tickers():
         return
     response = requests.get(
         "https://www.sec.gov/files/company_tickers.json",
-        headers={"User-Agent": "company-analyzer pminseo2004@gmail.com"},
+        headers={"User-Agent": USER_AGENT},
     )
-    json_file = response.text 
+    json_file = response.text
     with open(ticker_file_path(), "w", encoding="utf-8") as f:
         f.write(json_file)
 
@@ -73,8 +79,40 @@ def get_company_facts(ticker: str, cik_ticker: str):
         return
     response = requests.get(
         f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik_ticker}.json",
-        headers={"User-Agent": "company-analyzer pminseo2004@gmail.com"},
+        headers={"User-Agent": USER_AGENT},
     )
     json_file = response.text
     with open(facts_file_path(ticker), "w", encoding="utf-8") as f:
-        f.write(json_file) 
+        f.write(json_file)
+
+
+def get_company_sic(ticker: str, cik_ticker: str) -> str:
+    directory_check()
+    path = sic_file_path(ticker)
+
+    if not duration_check(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                cached = json.load(f)
+            return cached.get("sicDescription", "")
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    try:
+        response = requests.get(
+            f"https://data.sec.gov/submissions/CIK{cik_ticker}.json",
+            headers={"User-Agent": USER_AGENT},
+            timeout=15,
+        )
+        data = response.json()
+        sic_desc = data.get("sicDescription", "")
+    except (requests.RequestException, ValueError):
+        sic_desc = ""
+
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"sicDescription": sic_desc}, f)
+    except OSError:
+        pass
+
+    return sic_desc
