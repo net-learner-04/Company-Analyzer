@@ -24,10 +24,10 @@
 - **calculate.py** : ROE, ROA, 듀폰분석 등 재무비율 계산하고 콘솔에 표로 출력
 - **discord.py** : 기업의 자세한 지표 테이블을 디스코드 서버의 웹 후크를 이용하여 서버로 전송
 
-## 설치
+## 모듈 설치
 
 ```bash
-pip3 install -r modules.txt
+python3 -m pip install -r modules.txt
 ```
 
 ## 실행
