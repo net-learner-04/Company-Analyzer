@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 import calculate, extract, parse
 
-dotenv.load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent / ".env")
 
 TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
 
@@ -40,14 +40,18 @@ async def financials(interaction: discord.Interaction, ticker: str):
 
     if data is None:
         await interaction.followup.send(f"티커를 찾을 수 없습니다: {ticker}")
+        
         return
 
-    text = calculate.build_report_text(ticker, data, sector)
-    if len(text) <= 1900:
-        await interaction.followup.send(f"```{text}```")
-    else:
-        embed = discord.Embed(description=f"```{text[:4000]}```", color=0x2b2d42)
-        await interaction.followup.send(embed=embed)
+    text = calculate.build_report_ansi(ticker, data, sector)
 
+    if len(text) <= 1990:
+        await interaction.followup.send(f"```ansi\n{text}\n```")   
+    else:
+        chunk_size = 1980
+        
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i:i + chunk_size]
+            await interaction.followup.send(f"```ansi\n{chunk}\n```")
 
 client.run(TOKEN)
