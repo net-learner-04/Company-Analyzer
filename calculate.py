@@ -277,8 +277,7 @@ def render_console(structure) -> None:
 
     console.print()
     
-    console.print(f"[bold]{structure['title_line']}\t \
-        {structure['unit_note']}[/bold]")
+    console.print(f"[bold]{structure['title_line']}  {structure['unit_note']}[/bold]")
     
     console.print()
 
