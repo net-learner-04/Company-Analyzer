@@ -1,7 +1,8 @@
 from dotenv import load_dotenv
+from pathlib import Path
 import sys, calculate, notify, extract, parse
 
-load_dotenv()
+dotenv.load_dotenv(Path(__file__).parent / ".env")
 
 
 def start():
