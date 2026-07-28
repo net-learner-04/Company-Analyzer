@@ -2,7 +2,7 @@ import os, time, requests, calculate, parse
 
 
 def build_payload(ticker: str, data: "parse.Data", sector: str = "") -> dict:
-    text = calculate.build_report_text(ticker, data, sector)
+    text = calculate.build_report_ansi(ticker, data, sector)
 
     if "표시할 데이터가 없습니다" in text:
         return {
@@ -25,6 +25,7 @@ def build_payload(ticker: str, data: "parse.Data", sector: str = "") -> dict:
 
 def send_discord(ticker: str, data: "parse.Data", sector: str = ""):
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL", "")
+    
     if not webhook_url:
         print(".env에 DISCORD_WEBHOOK_URL을 설정해주세요.")
         return
