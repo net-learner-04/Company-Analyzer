@@ -1,40 +1,19 @@
-import unicodedata
-from rich import box
-from rich.columns import Columns
-from rich.console import Console, Group
-from rich.panel import Panel
-from rich.rule import Rule
-from rich.table import Table
+from rich.console import Console
 from rich.text import Text
-
-
-def _disp_width(s: str) -> int:
-    return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in s)
-
-
-def _ljust(s: str, width: int) -> str:
-    pad = max(0, width - _disp_width(s))
-    
-    return s + " " * pad
 
 
 def match_years(base, other, calc):
     result = []
-    
     for date, base_val in base:
         if len(date) < 4:
             continue
-            
         yr = date[:4]
-        
         match = next(
             (other_val for d, other_val in other if len(d) >= 4 and d[:4] == yr),
             None,
         )
-        
         if match is not None:
             result.append((yr, calc(float(base_val), float(match))))
-            
     return result
 
 
@@ -87,16 +66,14 @@ def yoy_growth(vals):
     sorted_vals = sorted(vals, key=lambda x: x[0])
 
     by_year = []
+    
     for date, val in sorted_vals:
         if len(date) < 4:
             continue
-            
         yr = date[:4]
-        
         if by_year and by_year[-1][0] == yr:
             by_year[-1] = (yr, val)
             continue
-            
         by_year.append((yr, val))
 
     result = []
@@ -110,101 +87,24 @@ def yoy_growth(vals):
     return result
 
 
-def dupont(npm_vals, at_vals, em_vals):
-    result = []
+def fmt_val(v) -> str:
+    sign = "-" if v < 0 else ""
+    v = abs(v)
     
-    for yr, npm_v in npm_vals:
-        at_v = next((v for y, v in at_vals if y == yr), None)
+    if v >= 1_000_000_000_000:
+        return f"{sign}{v / 1_000_000_000_000:.2f}T"
+    if v >= 1_000_000_000:
+        return f"{sign}{v / 1_000_000_000:.2f}B"
+    if v >= 1_000_000:
+        return f"{sign}{v / 1_000_000:.2f}M"
+    if v >= 1_000:
+        return f"{sign}{v / 1_000:.2f}K"
         
-        if at_v is None:
-            continue
-            
-        em_v = next((v for y, v in em_vals if y == yr), None)
-        
-        if em_v is None:
-            continue
-            
-        result.append((yr, npm_v / 100.0 * at_v * em_v * 100.0))
-        
-    return result
-
-
-def fmt_val(v: int) -> str:
-    s = str(abs(v))
-    chunks = []
-    
-    for i in range(len(s), 0, -3):
-        start = max(0, i - 3)
-        chunks.append(s[start:i])
-    chunked = ",".join(reversed(chunks))
-    
-    return f"-{chunked}" if v < 0 else chunked
-
-
-def raw_cell(vals, year) -> Text:
-    found = next(((d, v) for d, v in vals if len(d) >= 4 and d[:4] == year), None)
-    text = fmt_val(found[1]) if found else "N/A"
-    cell = Text(text, justify="right")
-    
-    if found and found[1] < 0:
-        cell.stylize("red")
-        
-    return cell
-
-
-def pct_cell(vals, year) -> Text:
-    found = next(((yr, v) for yr, v in vals if yr == year), None)
-    text = f"{found[1]:.2f}%" if found else "N/A"
-    cell = Text(text, justify="right")
-    
-    if found:
-        if found[1] < 0.0:
-            cell.stylize("red")
-        elif found[1] >= 15.0:
-            cell.stylize("green")
-            
-    return cell
-
-
-def growth_cell(vals, year) -> Text:
-    found = next(((yr, v) for yr, v in vals if yr == year), None)
-    text = f"{found[1]:+.2f}%" if found else "N/A"
-    cell = Text(text, justify="right")
-    
-    if found:
-        if found[1] < 0.0:
-            cell.stylize("red")
-        elif found[1] > 0.0:
-            cell.stylize("green")
-            
-    return cell
-
-
-def x_cell(vals, year) -> Text:
-    found = next(((yr, v) for yr, v in vals if yr == year), None)
-    text = f"{found[1]:.2f}x" if found else "N/A"
-    
-    return Text(text, justify="right")
-
-
-def label_cell(text: str) -> Text:
-    cell = Text(text)
-    cell.stylize("bold")
-    
-    return cell
-
-
-def section_header_row(years, title) -> list:
-    row = [label_cell(title)]
-    for _ in years:
-        row.append(Text(""))
-        
-    return row
+    return f"{sign}{v:.0f}"
 
 
 def _collect_years(data, *extra_series) -> list:
     years = []
-    
     for ds in (
         data.revenues,
         data.netincomeloss,
@@ -216,7 +116,6 @@ def _collect_years(data, *extra_series) -> list:
         for date, _ in ds:
             if len(date) >= 4:
                 years.append(date[:4])
-                
     for ds in extra_series:
         for yr, _ in ds:
             years.append(yr)
@@ -224,118 +123,64 @@ def _collect_years(data, *extra_series) -> list:
     return sorted(set(years))
 
 
-def print_table(ticker: str, data):
-    roe_val = roe(data.netincomeloss, data.stockholdersequity)
-    roa_val = roa(data.netincomeloss, data.assets)
-    opm_val = opm(data.operatingincomeloss, data.revenues)
-    npm_val = npm(data.netincomeloss, data.revenues)
-    der_val = der(data.liabilities, data.stockholdersequity)
-    er_val = er(data.stockholdersequity, data.assets)
-    at_val = at(data.revenues, data.assets)
-
-    dr_val = debt_ratio(data.liabilities, data.assets)
-    em_val = equity_multiplier(data.assets, data.stockholdersequity)
-
-    rev_growth = yoy_growth(data.revenues)
-    ni_growth = yoy_growth(data.netincomeloss)
-
-    dupont_val = dupont(npm_val, at_val, em_val)
-
-    years = _collect_years(
-        data, roe_val, roa_val, opm_val, npm_val,
-        der_val, er_val, at_val,
-        dr_val, em_val,
-        rev_growth, ni_growth, dupont_val,
-    )
-
-    if not years:
-        print(f"=== {ticker} ===")
-        print("  표시할 재무 데이터가 없습니다.")
-        
-        return
-
-    table = Table(box=box.ROUNDED, show_lines=False)
-    table.add_column(f"  {ticker}  재무제표", header_style="bold green")
-    
-    for y in years:
-        table.add_column(y, justify="center", header_style="bold")
-
-    table.add_row(*section_header_row(years, "▸ 손익"))
-    
-    for label, vals in (
-        ("매출", data.revenues),
-        ("영업이익", data.operatingincomeloss),
-        ("순이익", data.netincomeloss),
-    ):
-        table.add_row(label_cell(label), *[raw_cell(vals, y) for y in years])
-
-    table.add_row(*section_header_row(years, "▸ 성장률"))
-    table.add_row(label_cell("매출 성장률"), *[growth_cell(rev_growth, y) for y in years])
-    table.add_row(label_cell("순이익 성장률"), *[growth_cell(ni_growth, y) for y in years])
-
-    table.add_row(*section_header_row(years, "▸ 재무상태"))
-    
-    for label, vals in (
-        ("총자산", data.assets),
-        ("부채", data.liabilities),
-        ("자기자본", data.stockholdersequity),
-    ):
-        table.add_row(label_cell(label), *[raw_cell(vals, y) for y in years])
-
-    table.add_row(*section_header_row(years, "▸ 수익성 지표"))
-    
-    for label, vals in (
-        ("ROE  자기자본이익률", roe_val),
-        ("ROA  총자산이익률", roa_val),
-        ("OPM  영업이익률", opm_val),
-        ("NPM  순이익률", npm_val),
-    ):
-        table.add_row(label_cell(label), *[pct_cell(vals, y) for y in years])
-
-    table.add_row(*section_header_row(years, "▸ 안정성 지표"))
-    table.add_row(label_cell("DER  부채자본비율"), *[pct_cell(der_val, y) for y in years])
-    table.add_row(label_cell("DR   총부채비율"), *[pct_cell(dr_val, y) for y in years])
-    table.add_row(label_cell("ER   자기자본비율"), *[pct_cell(er_val, y) for y in years])
-    table.add_row(label_cell("AT   자산회전율"), *[x_cell(at_val, y) for y in years])
-    table.add_row(label_cell("EM   재무레버리지"), *[x_cell(em_val, y) for y in years])
-
-    table.add_row(*section_header_row(years, "▸ DuPont 분석 "))
-    table.add_row(label_cell("NPM  순이익률"), *[pct_cell(npm_val, y) for y in years])
-    table.add_row(label_cell("AT   자산회전율"), *[x_cell(at_val, y) for y in years])
-    table.add_row(label_cell("EM   재무레버리지"), *[x_cell(em_val, y) for y in years])
-    table.add_row(label_cell("ROE  검증값"), *[pct_cell(dupont_val, y) for y in years])
-
-    console = Console()
-    console.print()
-    console.print(table)
-
-
-def _fmt_raw(vals, year):
+def _cell_raw(vals, year):
     found = next(((d, v) for d, v in vals if len(d) >= 4 and d[:4] == year), None)
     
-    return fmt_val(found[1]) if found else "N/A"
+    if found is None:
+        return "N/A", None
+        
+    text = fmt_val(found[1])
+    color = "red" if found[1] < 0 else None
+    
+    return text, color
 
 
-def _fmt_pct(vals, year):
+def _cell_pct(vals, year):
     found = next(((yr, v) for yr, v in vals if yr == year), None)
     
-    return f"{found[1]:.2f}%" if found else "N/A"
+    if found is None:
+        return "N/A", None
+        
+    text = f"{found[1]:.2f}%"
+    
+    if found[1] < 0.0:
+        color = "red"
+    elif found[1] >= 15.0:
+        color = "green"
+    else:
+        color = None
+        
+    return text, color
 
 
-def _fmt_growth(vals, year):
+def _cell_growth(vals, year):
     found = next(((yr, v) for yr, v in vals if yr == year), None)
     
-    return f"{found[1]:+.2f}%" if found else "N/A"
+    if found is None:
+        return "N/A", None
+        
+    text = f"{found[1]:+.2f}%"
+    
+    if found[1] < 0.0:
+        color = "red"
+    elif found[1] > 0.0:
+        color = "green"
+    else:
+        color = None
+        
+    return text, color
 
 
-def _fmt_x(vals, year):
+def _cell_x(vals, year):
     found = next(((yr, v) for yr, v in vals if yr == year), None)
     
-    return f"{found[1]:.2f}x" if found else "N/A"
+    if found is None:
+        return "N/A", None
+        
+    return f"{found[1]:.2f}x", None
 
 
-def build_report_text(ticker: str, data, sector: str = "") -> str:
-    """디스코드 등 텍스트 채널용: print_table과 동일한 항목/순서를 코드블록 텍스트로 렌더링."""
+def build_structure(ticker: str, data, sector: str = ""):
     roe_val = roe(data.netincomeloss, data.stockholdersequity)
     roa_val = roa(data.netincomeloss, data.assets)
     opm_val = opm(data.operatingincomeloss, data.revenues)
@@ -347,68 +192,162 @@ def build_report_text(ticker: str, data, sector: str = "") -> str:
     em_val = equity_multiplier(data.assets, data.stockholdersequity)
     rev_growth = yoy_growth(data.revenues)
     ni_growth = yoy_growth(data.netincomeloss)
-    dupont_val = dupont(npm_val, at_val, em_val)
 
     years = _collect_years(
         data, roe_val, roa_val, opm_val, npm_val,
         der_val, er_val, at_val,
         dr_val, em_val,
-        rev_growth, ni_growth, dupont_val,
+        rev_growth, ni_growth,
     )
 
     if not years:
-        return f"{ticker}: 표시할 데이터가 없습니다."
+        return None
 
     sections = [
-        ("▸ 손익", [
-            ("매출", data.revenues, _fmt_raw),
-            ("영업이익", data.operatingincomeloss, _fmt_raw),
-            ("순이익", data.netincomeloss, _fmt_raw),
+        ("[Income]", [
+            ("Revenue", data.revenues, _cell_raw),
+            ("OpIncome", data.operatingincomeloss, _cell_raw),
+            ("NetIncome", data.netincomeloss, _cell_raw),
         ]),
-        ("▸ 성장률", [
-            ("매출 성장률", rev_growth, _fmt_growth),
-            ("순이익 성장률", ni_growth, _fmt_growth),
+        ("[Growth]", [
+            ("RevGrowth", rev_growth, _cell_growth),
+            ("NIGrowth", ni_growth, _cell_growth),
         ]),
-        ("▸ 재무상태", [
-            ("총자산", data.assets, _fmt_raw),
-            ("부채", data.liabilities, _fmt_raw),
-            ("자기자본", data.stockholdersequity, _fmt_raw),
+        ("[Balance]", [
+            ("Assets", data.assets, _cell_raw),
+            ("Liabilities", data.liabilities, _cell_raw),
+            ("Equity", data.stockholdersequity, _cell_raw),
         ]),
-        ("▸ 수익성 지표", [
-            ("ROE", roe_val, _fmt_pct),
-            ("ROA", roa_val, _fmt_pct),
-            ("OPM", opm_val, _fmt_pct),
-            ("NPM", npm_val, _fmt_pct),
+        ("[Profitability]", [
+            ("ROE", roe_val, _cell_pct),
+            ("ROA", roa_val, _cell_pct),
+            ("OPM", opm_val, _cell_pct),
+            ("NPM", npm_val, _cell_pct),
         ]),
-        ("▸ 안정성 지표", [
-            ("DER", der_val, _fmt_pct),
-            ("DR", dr_val, _fmt_pct),
-            ("ER", er_val, _fmt_pct),
-            ("AT", at_val, _fmt_x),
-            ("EM", em_val, _fmt_x),
-        ]),
-        ("▸ DuPont 분석", [
-            ("NPM", npm_val, _fmt_pct),
-            ("AT", at_val, _fmt_x),
-            ("EM", em_val, _fmt_x),
-            ("ROE 검증값", dupont_val, _fmt_pct),
+        ("[Stability]", [
+            ("DER", der_val, _cell_pct),
+            ("DR", dr_val, _cell_pct),
+            ("ER", er_val, _cell_pct),
+            ("AT", at_val, _cell_x),
+            ("EM", em_val, _cell_x),
         ]),
     ]
 
-    all_labels = [row[0] for _, rows in sections for row in rows]
-    label_width = max(_disp_width(l) for l in all_labels) + 2
-    col_width = 12
-
-    header = _ljust("항목", label_width) + "".join(y.rjust(col_width) for y in years)
-    lines = [header, "-" * len(header)]
-
-    for title, rows in sections:
-        lines.append(title)
-        for label, vals, fmt_fn in rows:
-            cells = "".join(fmt_fn(vals, y).rjust(col_width) for y in years)
-            lines.append(_ljust(label, label_width) + cells)
-        lines.append("")
-
-    title_line = f"{ticker} {sector}".strip()
+    rendered_sections = []
     
-    return f"{title_line}\n\n" + "\n".join(lines).rstrip()
+    all_labels = []
+    
+    max_cell_len = 0
+    
+    for title, rows in sections:
+        rendered_rows = []
+        
+        for label, vals, cell_fn in rows:
+            all_labels.append(label)
+            cells = [cell_fn(vals, y) for y in years]
+            max_cell_len = max(max_cell_len, max(len(c[0]) for c in cells))
+            rendered_rows.append((label, cells))
+            
+        rendered_sections.append((title, rendered_rows))
+
+    label_width = max(len(l) for l in all_labels) + 2
+    col_width = max(max_cell_len, max(len(y) for y in years)) + 2
+
+    title_line = f"{ticker}  {sector}".strip()
+    unit_note = "단위: K=천 M=백만 B=십억 T=조"
+
+    return {
+        "title_line": title_line,
+        "unit_note": unit_note,
+        "sector": sector,
+        "years": years,
+        "sections": rendered_sections,
+        "label_width": label_width,
+        "col_width": col_width,
+    }
+
+
+def render_console(structure) -> None:
+    console = Console()
+    
+    label_width = structure["label_width"]
+    col_width = structure["col_width"]
+    years = structure["years"]
+    total_width = label_width + col_width * len(years)
+
+    console.print()
+    
+    console.print(f"[bold]{structure['title_line']}\t \
+        {structure['unit_note']}[/bold]")
+    
+    console.print()
+
+    header = Text("".ljust(label_width))
+    
+    for y in years:
+        header.append(y.rjust(col_width))
+    console.print(header)
+    console.print("-" * total_width, style="dim")
+
+    for title, rows in structure["sections"]:
+        console.print(f"[bold]{title}[/bold]")
+        for label, cells in rows:
+            line = Text(label.ljust(label_width))
+            for text, color in cells:
+                cell_text = Text(text.rjust(col_width))
+                if color:
+                    cell_text.stylize(color)
+                line.append_text(cell_text)
+            console.print(line)
+        console.print("-" * total_width, style="dim")
+
+
+_ANSI_RESET = "\u001b[0m"
+_ANSI_COLOR = {"red": "\u001b[31m", "green": "\u001b[32m"}
+
+
+def render_discord_ansi(structure) -> str:
+    label_width = structure["label_width"]
+    col_width = structure["col_width"]
+    years = structure["years"]
+    total_width = label_width + col_width * len(years)
+
+    lines = [structure["title_line"], structure["unit_note"], structure["sector"]]
+
+    header = "".ljust(label_width) + "".join(y.rjust(col_width) for y in years)
+    lines.append(header)
+    lines.append("-" * total_width)
+
+    for title, rows in structure["sections"]:
+        lines.append(title)
+        for label, cells in rows:
+            row = label.ljust(label_width)
+            for text, color in cells:
+                cell = text.rjust(col_width)
+                if color:
+                    cell = f"{_ANSI_COLOR[color]}{cell}{_ANSI_RESET}"
+                row += cell
+            lines.append(row)
+        lines.append("-" * total_width)
+
+    return "\n".join(lines).rstrip()
+
+
+def print_table(ticker: str, data, sector: str = ""):
+    structure = build_structure(ticker, data, sector)
+    
+    if structure is None:
+        print(f"=== {ticker} ===")
+        print("  표시할 재무 데이터가 없습니다.")
+        return
+        
+    render_console(structure)
+
+
+def build_report_ansi(ticker: str, data, sector: str = "") -> str:
+    structure = build_structure(ticker, data, sector)
+    
+    if structure is None:
+        return f"{ticker}: 표시할 데이터가 없습니다."
+        
+    return render_discord_ansi(structure)
