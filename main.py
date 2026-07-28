@@ -13,7 +13,9 @@ def start():
         sys.exit(1)
         
     input_ticker = args[1].upper()
+    
     extract.get_company_tickers()
+    
     cik = extract.return_ticker(input_ticker)
     
     if not cik:
@@ -21,9 +23,11 @@ def start():
         sys.exit(1)
         
     extract.get_company_facts(input_ticker, cik)
+    
     sector = extract.get_company_sic(input_ticker, cik)
     data = parse.Data.new(input_ticker)
-    calculate.print_summary(input_ticker, data, sector)
+    
+    calculate.print_table(input_ticker, data)
     
     try:
         ans = input("Discord에 전송하시겠습니까? (y/n): ").strip().lower()
