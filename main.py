@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 import sys, calculate, notify, extract, parse
 
-dotenv.load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent / ".env")
 
 
 def start():
@@ -28,7 +28,7 @@ def start():
     sector = extract.get_company_sic(input_ticker, cik)
     data = parse.Data.new(input_ticker)
     
-    calculate.print_table(input_ticker, data)
+    calculate.print_table(input_ticker, data, sector)
     
     try:
         ans = input("Discord에 전송하시겠습니까? (y/n): ").strip().lower()
@@ -37,6 +37,7 @@ def start():
         
     if ans == "y":
         notify.send_discord(input_ticker, data, sector)
+        
         
 if __name__ == "__main__":
     start()
