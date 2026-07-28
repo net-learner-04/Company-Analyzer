@@ -253,12 +253,10 @@ def build_structure(ticker: str, data, sector: str = ""):
     label_width = max(len(l) for l in all_labels) + 2
     col_width = max(max_cell_len, max(len(y) for y in years)) + 2
 
-    title_line = f"{ticker}  {sector}".strip()
-    unit_note = "단위: K=천 M=백만 B=십억 T=조"
+    title_line = f"{ticker}  {sector}  단위: K=천 M=백만 B=십억 T=조".strip()
 
     return {
         "title_line": title_line,
-        "unit_note": unit_note,
         "sector": sector,
         "years": years,
         "sections": rendered_sections,
@@ -277,7 +275,7 @@ def render_console(structure) -> None:
 
     console.print()
     
-    console.print(f"[bold]{structure['title_line']}  {structure['unit_note']}[/bold]")
+    console.print(f"[bold]{structure['title_line']}[/bold]")
     
     console.print()
 
@@ -285,17 +283,22 @@ def render_console(structure) -> None:
     
     for y in years:
         header.append(y.rjust(col_width))
+        
     console.print(header)
     console.print("-" * total_width, style="dim")
 
     for title, rows in structure["sections"]:
         console.print(f"[bold]{title}[/bold]")
+        
         for label, cells in rows:
             line = Text(label.ljust(label_width))
+            
             for text, color in cells:
                 cell_text = Text(text.rjust(col_width))
+                
                 if color:
                     cell_text.stylize(color)
+                    
                 line.append_text(cell_text)
             console.print(line)
         console.print("-" * total_width, style="dim")
@@ -311,7 +314,7 @@ def render_discord_ansi(structure) -> str:
     years = structure["years"]
     total_width = label_width + col_width * len(years)
 
-    lines = [structure["title_line"], structure["unit_note"], structure["sector"]]
+    lines = [structure["title_line"]]
 
     header = "".ljust(label_width) + "".join(y.rjust(col_width) for y in years)
     lines.append(header)
@@ -319,12 +322,16 @@ def render_discord_ansi(structure) -> str:
 
     for title, rows in structure["sections"]:
         lines.append(title)
+        
         for label, cells in rows:
             row = label.ljust(label_width)
+            
             for text, color in cells:
                 cell = text.rjust(col_width)
+                
                 if color:
                     cell = f"{_ANSI_COLOR[color]}{cell}{_ANSI_RESET}"
+                    
                 row += cell
             lines.append(row)
         lines.append("-" * total_width)
